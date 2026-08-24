@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
+import Papa from "papaparse";
 import { Chart } from "./Chart";
 import {
   datasets,
@@ -7,30 +8,12 @@ import {
   type ChartType,
   type Client,
   type ClientStage,
-  type DatasetKey,
+  type DatasetDefinition,
   type ReportWidget,
 } from "./data";
 import { buildChartOption } from "./reporting";
 
 type View = "dashboard" | "clients" | "builder";
-
-interface AppUser {
-  name?: string;
-  email?: string;
-  picture?: string;
-}
-
-interface AppProps {
-  mode: "auth0" | "demo";
-  user?: AppUser;
-  onLogout?: () => void;
-}
-
-interface LoginScreenProps {
-  onLogin: () => void;
-  loading?: boolean;
-  error?: string;
-}
 
 const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -43,44 +26,13 @@ function readStored<T>(key: string, fallback: T): T {
   }
 }
 
-function initials(name = "Demo Analyst") {
-  return name.split(" ").slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-}
-
-export function LoginScreen({ onLogin, loading = false, error }: LoginScreenProps) {
-  return (
-    <main className="login-shell">
-      <section className="login-copy">
-        <a className="brand brand--login" href="/" aria-label="Report Studio home"><span>RS</span> Report Studio</a>
-        <div>
-          <h1>Turn account data into charts.</h1>
-          <p>Build dashboards, track commercial activity and give every analyst a shared view of the pipeline.</p>
-        </div>
-        <button className="button button--primary" type="button" onClick={onLogin} disabled={loading} aria-busy={loading}>
-          {loading ? "Connecting…" : "Sign in with Auth0"}
-        </button>
-        {error && <p className="form-error" role="alert">Sign-in failed. {error} Try again.</p>}
-      </section>
-
-      <section className="login-proof" aria-label="Dashboard preview">
-        <div className="mini-stat"><span>Pipeline</span><strong>$97k</strong><small>Demo workspace</small></div>
-        <div className="mini-bars" aria-hidden="true">
-          {[38, 52, 46, 68, 74, 88].map((height, index) => <i key={index} style={{ "--bar": `${height}%` } as React.CSSProperties} />)}
-        </div>
-        <div className="mini-list">
-          <span>Referral <strong>42 leads</strong></span>
-          <span>Organic <strong>35 leads</strong></span>
-          <span>Outbound <strong>29 leads</strong></span>
-        </div>
-      </section>
-    </main>
-  );
-}
-
-export default function App({ mode, user, onLogout }: AppProps) {
+export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const [clients, setClients] = useState<Client[]>(() => readStored("report-studio.clients", seedClients));
   const [widgets, setWidgets] = useState<ReportWidget[]>(() => readStored("report-studio.widgets", defaultWidgets));
+  const [customDatasets, setCustomDatasets] = useState<Record<string, DatasetDefinition>>(() => readStored("report-studio.datasets", {}));
+  const [csvError, setCsvError] = useState("");
+  const [csvMessage, setCsvMessage] = useState("");
   const [query, setQuery] = useState("");
   const [stage, setStage] = useState<ClientStage | "All">("All");
   const [undoWidget, setUndoWidget] = useState<ReportWidget | null>(null);
@@ -95,7 +47,8 @@ export default function App({ mode, user, onLogout }: AppProps) {
     metric: "meetings",
   });
 
-  const activeDataset = datasets[draft.dataset];
+  const allDatasets = useMemo<Record<string, DatasetDefinition>>(() => ({ ...datasets, ...customDatasets }), [customDatasets]);
+  const activeDataset = allDatasets[draft.dataset] ?? datasets.activity;
   const previewWidget: ReportWidget = { ...draft, id: "preview" };
   const filteredClients = useMemo(() => clients.filter((client) => {
     const matchesQuery = `${client.contact} ${client.company} ${client.email}`.toLowerCase().includes(query.toLowerCase());
@@ -116,14 +69,75 @@ export default function App({ mode, user, onLogout }: AppProps) {
     localStorage.setItem("report-studio.widgets", JSON.stringify(next));
   }
 
-  function changeDataset(dataset: DatasetKey) {
-    const definition = datasets[dataset];
+  function changeDataset(dataset: string) {
+    const definition = allDatasets[dataset];
+    if (!definition) return;
     setDraft((current) => ({
       ...current,
       dataset,
       dimension: definition.dimensions[0].key,
       metric: definition.metrics[0].key,
     }));
+  }
+
+  function loadCsv(file?: File) {
+    setCsvError("");
+    setCsvMessage("");
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setCsvError("That file is not a CSV. Choose a file ending in .csv.");
+      return;
+    }
+    if (file.size > 1_000_000) {
+      setCsvError("That CSV is larger than 1 MB. Export a smaller file and try again.");
+      return;
+    }
+
+    Papa.parse<Record<string, unknown>>(file, {
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: "greedy",
+      complete: (result) => {
+        const fields = (result.meta.fields ?? []).map((field) => field.trim()).filter(Boolean);
+        if (result.errors.length || !fields.length || !result.data.length) {
+          setCsvError("The CSV could not be read. Confirm that its first row contains column names.");
+          return;
+        }
+
+        const rows = result.data.slice(0, 2000).map((row) => Object.fromEntries(fields.map((field) => {
+          const value = row[field];
+          return [field, typeof value === "number" ? value : String(value ?? "")];
+        })) as Record<string, string | number>);
+        const numericFields = fields.filter((field) => rows.some((row) => row[field] !== "") && rows.every((row) => row[field] === "" || typeof row[field] === "number"));
+        const dimensionFields = fields.filter((field) => !numericFields.includes(field));
+        const primaryDimension = dimensionFields[0] ?? fields[0];
+        const metricFields = numericFields.filter((field) => field !== primaryDimension);
+
+        if (!metricFields.length) {
+          setCsvError("No numeric measure was found. Add at least one column containing numbers.");
+          return;
+        }
+
+        const id = `csv:${crypto.randomUUID()}`;
+        const label = file.name.replace(/\.csv$/i, "");
+        const dataset: DatasetDefinition = {
+          label,
+          rows,
+          dimensions: (dimensionFields.length ? dimensionFields : [primaryDimension]).map((key) => ({ key, label: key })),
+          metrics: metricFields.map((key) => ({ key, label: key })),
+        };
+        const next = { ...customDatasets, [id]: dataset };
+        setCustomDatasets(next);
+        try {
+          localStorage.setItem("report-studio.datasets", JSON.stringify(next));
+        } catch {
+          setCsvError("The CSV loaded for this session but is too large to keep after refresh.");
+        }
+        setDraft({ title: label, dataset: id, type: "bar", dimension: dataset.dimensions[0].key, metric: dataset.metrics[0].key });
+        setCsvMessage(`${label} loaded · ${rows.length} rows · ${fields.length} columns`);
+      },
+      error: () => setCsvError("The browser could not read that CSV. Try exporting it again."),
+    });
   }
 
   function saveReport(event: FormEvent<HTMLFormElement>) {
@@ -159,7 +173,7 @@ export default function App({ mode, user, onLogout }: AppProps) {
       email: String(data.get("email")),
       stage: String(data.get("stage")) as ClientStage,
       value: Number(data.get("value")),
-      owner: user?.name?.split(" ")[0] || "Demo",
+      owner: "Local",
       lastActivity: "Just now",
     };
     persistClients([client, ...clients]);
@@ -185,20 +199,12 @@ export default function App({ mode, user, onLogout }: AppProps) {
           ))}
         </nav>
         <div className="sidebar-user">
-          <span className="avatar" aria-hidden="true">{initials(user?.name)}</span>
-          <span><strong>{user?.name || "Demo Analyst"}</strong><small>{mode === "auth0" ? user?.email : "Local demo mode"}</small></span>
-          {mode === "auth0" && <button className="text-button" type="button" onClick={onLogout}>Sign out</button>}
+          <span className="avatar" aria-hidden="true">CSV</span>
+          <span><strong>Local workspace</strong><small>Data stays in this browser</small></span>
         </div>
       </aside>
 
       <main className="workspace" id="top">
-        {mode === "demo" && (
-          <div className="demo-banner" role="status">
-            <span><strong>Demo workspace.</strong> Add Auth0 variables to enable secure sign-in.</span>
-            <a href="https://github.com/imdomk/report-studio#auth0-setup" target="_blank" rel="noopener noreferrer">Setup guide ↗</a>
-          </div>
-        )}
-
         <header className="workspace-header">
           <div>
             <p>{view === "builder" ? "Report playground" : "Ridgeline workspace"}</p>
@@ -219,8 +225,8 @@ export default function App({ mode, user, onLogout }: AppProps) {
             <div className="widget-grid">
               {widgets.map((widget) => (
                 <article className="report-widget" key={widget.id}>
-                  <header><div><small>{datasets[widget.dataset].label}</small><h2>{widget.title}</h2></div><button className="text-button" type="button" onClick={() => removeWidget(widget)}>Remove</button></header>
-                  <Chart label={widget.title} option={buildChartOption(widget)} />
+                  <header><div><small>{allDatasets[widget.dataset]?.label ?? "Unavailable data"}</small><h2>{widget.title}</h2></div><button className="text-button" type="button" onClick={() => removeWidget(widget)}>Remove</button></header>
+                  <Chart label={widget.title} option={buildChartOption(widget, allDatasets)} />
                 </article>
               ))}
               {widgets.length === 0 && (
@@ -260,21 +266,28 @@ export default function App({ mode, user, onLogout }: AppProps) {
         {view === "builder" && (
           <section className="builder-layout" aria-label="Chart builder">
             <form className="builder-form" onSubmit={saveReport}>
-              <p>Choose a dataset, dimension and measure. The preview updates before you save.</p>
+              <p>Upload a CSV or use a sample dataset. Choose a dimension, measure and chart type; the preview updates before you save.</p>
+              <label className="csv-upload">
+                <span className="csv-upload__button">Upload CSV</span>
+                <input type="file" accept=".csv,text/csv" onChange={(event) => { loadCsv(event.target.files?.[0]); event.target.value = ""; }} />
+                <small>CSV with headers · maximum 1 MB · first 2,000 rows</small>
+              </label>
+              {csvMessage && <p className="csv-message" role="status">{csvMessage}</p>}
+              {csvError && <p className="csv-error" role="alert">{csvError}</p>}
               <label><span>Report title</span><input required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
-              <label><span>Dataset</span><select value={draft.dataset} onChange={(event) => changeDataset(event.target.value as DatasetKey)}>{Object.entries(datasets).map(([key, dataset]) => <option key={key} value={key}>{dataset.label}</option>)}</select></label>
+              <label><span>Dataset</span><select value={draft.dataset} onChange={(event) => changeDataset(event.target.value)}>{Object.entries(allDatasets).map(([key, dataset]) => <option key={key} value={key}>{dataset.label}</option>)}</select></label>
               <div className="field-pair">
                 <label><span>Dimension</span><select value={draft.dimension} onChange={(event) => setDraft({ ...draft, dimension: event.target.value })}>{activeDataset.dimensions.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select></label>
                 <label><span>Measure</span><select value={draft.metric} onChange={(event) => setDraft({ ...draft, metric: event.target.value })}>{activeDataset.metrics.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select></label>
               </div>
-              <fieldset><legend>Chart type</legend><div className="type-picker">{(["bar", "line", "pie"] as ChartType[]).map((type) => <label key={type}><input type="radio" name="chart-type" value={type} checked={draft.type === type} onChange={() => setDraft({ ...draft, type })} /><span>{type[0].toUpperCase() + type.slice(1)}</span></label>)}</div></fieldset>
+              <fieldset><legend>Chart type</legend><div className="type-picker">{(["bar", "line", "area", "pie", "scatter", "radar", "funnel"] as ChartType[]).map((type) => <label key={type}><input type="radio" name="chart-type" value={type} checked={draft.type === type} onChange={() => setDraft({ ...draft, type })} /><span>{type[0].toUpperCase() + type.slice(1)}</span></label>)}</div></fieldset>
               <div className="form-actions"><button className="button" type="button" onClick={() => setView("dashboard")}>Cancel</button><button className="button button--primary" type="submit">Add to dashboard</button></div>
             </form>
-            <article className="builder-preview"><header><small>Live preview</small><h2>{draft.title || "Untitled report"}</h2></header><Chart label={`Preview of ${draft.title}`} option={buildChartOption(previewWidget)} className="chart--large" /></article>
+            <article className="builder-preview"><header><small>Live preview</small><h2>{draft.title || "Untitled report"}</h2></header><Chart label={`Preview of ${draft.title}`} option={buildChartOption(previewWidget, allDatasets)} className="chart--large" /></article>
           </section>
         )}
 
-        <footer className="status-footer"><span>Report Studio · local-first demo</span><span>React · Auth0 · ECharts</span></footer>
+        <footer className="status-footer"><span>Report Studio · local CSV workspace</span><span>React · Papa Parse · ECharts</span></footer>
       </main>
 
       <dialog ref={clientDialog} className="client-dialog" onClick={(event) => { if (event.target === event.currentTarget) clientDialog.current?.close(); }}>

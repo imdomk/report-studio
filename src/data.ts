@@ -11,12 +11,12 @@ export interface Client {
   lastActivity: string;
 }
 
-export type ChartType = "bar" | "line" | "pie";
+export type ChartType = "bar" | "line" | "area" | "pie" | "scatter" | "radar" | "funnel";
 
 export interface ReportWidget {
   id: string;
   title: string;
-  dataset: DatasetKey;
+  dataset: string;
   type: ChartType;
   dimension: string;
   metric: string;

@@ -1,10 +1,13 @@
 import type { EChartsOption } from "echarts";
-import { datasets, type ReportWidget } from "./data";
+import type { DatasetDefinition, ReportWidget } from "./data";
 
-export function buildChartOption(widget: ReportWidget): EChartsOption {
-  const dataset = datasets[widget.dataset];
+export function buildChartOption(widget: ReportWidget, availableDatasets: Record<string, DatasetDefinition>): EChartsOption {
+  const dataset = availableDatasets[widget.dataset];
+  if (!dataset) return {};
   const labels = dataset.rows.map((row) => String(row[widget.dimension]));
   const values = dataset.rows.map((row) => Number(row[widget.metric]));
+  const compactLabels = labels.slice(0, 12);
+  const compactValues = values.slice(0, 12);
 
   if (widget.type === "pie") {
     return {
@@ -16,8 +19,33 @@ export function buildChartOption(widget: ReportWidget): EChartsOption {
         radius: ["46%", "72%"],
         itemStyle: { borderWidth: 2 },
         label: { show: false },
-        data: labels.map((name, index) => ({ name, value: values[index] })),
+        data: compactLabels.map((name, index) => ({ name, value: compactValues[index] })),
       }],
+    };
+  }
+
+  if (widget.type === "funnel") {
+    return {
+      tooltip: { trigger: "item" },
+      series: [{
+        name: widget.title,
+        type: "funnel",
+        left: "10%",
+        width: "80%",
+        maxSize: "90%",
+        sort: "descending",
+        itemStyle: { borderWidth: 2 },
+        data: compactLabels.map((name, index) => ({ name, value: compactValues[index] })),
+      }],
+    };
+  }
+
+  if (widget.type === "radar") {
+    const ceiling = Math.max(...compactValues, 1);
+    return {
+      tooltip: { trigger: "item" },
+      radar: { indicator: compactLabels.map((name) => ({ name, max: Math.ceil(ceiling * 1.15) })) },
+      series: [{ type: "radar", data: [{ name: widget.title, value: compactValues }], areaStyle: { opacity: 0.12 } }],
     };
   }
 
@@ -28,9 +56,10 @@ export function buildChartOption(widget: ReportWidget): EChartsOption {
     yAxis: { type: "value", splitNumber: 4 },
     series: [{
       name: widget.title,
-      type: widget.type,
+      type: widget.type === "area" ? "line" : widget.type,
       data: values,
-      smooth: widget.type === "line",
+      smooth: widget.type === "line" || widget.type === "area",
+      areaStyle: widget.type === "area" ? { opacity: 0.14 } : undefined,
       symbol: "circle",
       symbolSize: 7,
       barMaxWidth: 32,

@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
-import { BarChart, LineChart, PieChart } from "echarts/charts";
-import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
+import { BarChart, FunnelChart, LineChart, PieChart, RadarChart, ScatterChart } from "echarts/charts";
+import { GridComponent, LegendComponent, RadarComponent, TooltipComponent } from "echarts/components";
 import type { EChartsOption } from "echarts";
 import { init, use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 
-use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);
+use([BarChart, LineChart, PieChart, ScatterChart, RadarChart, FunnelChart, GridComponent, LegendComponent, RadarComponent, TooltipComponent, CanvasRenderer]);
 
 interface ChartProps {
   label: string;
