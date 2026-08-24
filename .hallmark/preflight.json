@@ -1,0 +1,6 @@
+{
+  "scannedAt": "2026-08-24",
+  "framework": "empty project",
+  "preserve": [],
+  "introduce": ["React", "TypeScript", "Vite", "Coral tokens", "accessible interaction states"]
+}
