@@ -16,6 +16,8 @@ export type Aggregation = "sum" | "average" | "count" | "minimum" | "maximum";
 export type SortBy = "dimension" | "metric";
 export type SortDirection = "ascending" | "descending";
 export type FilterOperator = "equals" | "notEquals" | "contains" | "greaterThan" | "lessThan";
+export type ChartPalette = "coral" | "ocean" | "forest";
+export type ColorMode = "single" | "category";
 
 export interface ReportFilter {
   field: string;
@@ -34,6 +36,8 @@ export interface ReportWidget {
   sortBy?: SortBy;
   sortDirection?: SortDirection;
   filter?: ReportFilter;
+  palette?: ChartPalette;
+  colorMode?: ColorMode;
 }
 
 export interface DataField {

@@ -4,6 +4,7 @@ import { GridComponent, LegendComponent, RadarComponent, TooltipComponent } from
 import type { EChartsOption } from "echarts";
 import { init, use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
+import type { ChartPalette } from "./data";
 
 use([BarChart, LineChart, PieChart, ScatterChart, RadarChart, FunnelChart, GridComponent, LegendComponent, RadarComponent, TooltipComponent, CanvasRenderer]);
 
@@ -11,13 +12,20 @@ interface ChartProps {
   label: string;
   option: EChartsOption;
   className?: string;
+  palette?: ChartPalette;
 }
 
 function token(styles: CSSStyleDeclaration, name: string) {
   return styles.getPropertyValue(name).trim();
 }
 
-export function Chart({ label, option, className = "" }: ChartProps) {
+const paletteTokens: Record<ChartPalette, string[]> = {
+  coral: ["--color-chart-1", "--color-chart-2", "--color-chart-3", "--color-chart-4"],
+  ocean: ["--color-chart-ocean-1", "--color-chart-ocean-2", "--color-chart-ocean-3", "--color-chart-ocean-4"],
+  forest: ["--color-chart-forest-1", "--color-chart-forest-2", "--color-chart-forest-3", "--color-chart-forest-4"],
+};
+
+export function Chart({ label, option, className = "", palette = "coral" }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,12 +40,7 @@ export function Chart({ label, option, className = "" }: ChartProps) {
 
     chart.setOption({
       ...option,
-      color: [
-        token(styles, "--color-chart-1"),
-        token(styles, "--color-chart-2"),
-        token(styles, "--color-chart-3"),
-        token(styles, "--color-chart-4"),
-      ],
+      color: paletteTokens[palette].map((name) => token(styles, name)),
       textStyle: { fontFamily: token(styles, "--font-body"), color: ink },
       legend: option.legend ? { ...(option.legend as object), textStyle: { color: muted } } : undefined,
       xAxis: option.xAxis ? { ...(option.xAxis as object), axisLine: { lineStyle: { color: rule } }, axisLabel: { color: muted } } : undefined,
@@ -55,7 +58,7 @@ export function Chart({ label, option, className = "" }: ChartProps) {
       observer.disconnect();
       chart.dispose();
     };
-  }, [option]);
+  }, [option, palette]);
 
   return <div ref={containerRef} className={`chart ${className}`} role="img" aria-label={label} />;
 }

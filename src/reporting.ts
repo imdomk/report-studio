@@ -45,6 +45,7 @@ export function buildChartOption(widget: ReportWidget, availableDatasets: Record
   const values = points.map(({ value }) => value);
   const compactLabels = labels.slice(0, 12);
   const compactValues = values.slice(0, 12);
+  const colorBy = widget.colorMode === "category" || widget.type === "pie" || widget.type === "funnel" ? "data" : "series";
 
   if (widget.type === "pie") {
     return {
@@ -53,6 +54,7 @@ export function buildChartOption(widget: ReportWidget, availableDatasets: Record
       series: [{
         name: widget.title,
         type: "pie",
+        colorBy,
         radius: ["46%", "72%"],
         itemStyle: { borderWidth: 2 },
         label: { show: false },
@@ -67,6 +69,7 @@ export function buildChartOption(widget: ReportWidget, availableDatasets: Record
       series: [{
         name: widget.title,
         type: "funnel",
+        colorBy,
         left: "10%",
         width: "80%",
         maxSize: "90%",
@@ -82,7 +85,7 @@ export function buildChartOption(widget: ReportWidget, availableDatasets: Record
     return {
       tooltip: { trigger: "item" },
       radar: { indicator: compactLabels.map((name) => ({ name, max: Math.ceil(ceiling * 1.15) })) },
-      series: [{ type: "radar", data: [{ name: widget.title, value: compactValues }], areaStyle: { opacity: 0.12 } }],
+      series: [{ type: "radar", colorBy, data: [{ name: widget.title, value: compactValues }], areaStyle: { opacity: 0.12 } }],
     };
   }
 
@@ -94,6 +97,7 @@ export function buildChartOption(widget: ReportWidget, availableDatasets: Record
     series: [{
       name: widget.title,
       type: widget.type === "area" ? "line" : widget.type,
+      colorBy,
       data: values,
       smooth: widget.type === "line" || widget.type === "area",
       areaStyle: widget.type === "area" ? { opacity: 0.14 } : undefined,

@@ -7,10 +7,12 @@ import {
   seedClients,
   type Aggregation,
   type ChartType,
+  type ChartPalette,
   type Client,
   type ClientStage,
   type DatasetDefinition,
   type FilterOperator,
+  type ColorMode,
   type ReportWidget,
   type SortBy,
   type SortDirection,
@@ -54,6 +56,8 @@ export default function App() {
     aggregation: "sum",
     sortBy: "dimension",
     sortDirection: "ascending",
+    palette: "coral",
+    colorMode: "single",
   });
 
   const allDatasets = useMemo<Record<string, DatasetDefinition>>(() => ({ ...datasets, ...customDatasets }), [customDatasets]);
@@ -63,6 +67,7 @@ export default function App() {
   const activeMetric = activeDataset.metrics.find((field) => field.key === draft.metric);
   const filterFields = [...activeDataset.dimensions, ...activeDataset.metrics];
   const filterIsNumeric = activeDataset.metrics.some((field) => field.key === draft.filter?.field);
+  const usesCategoryColors = draft.type === "pie" || draft.type === "funnel";
   const filteredClients = useMemo(() => clients.filter((client) => {
     const matchesQuery = `${client.contact} ${client.company} ${client.email}`.toLowerCase().includes(query.toLowerCase());
     return matchesQuery && (stage === "All" || client.stage === stage);
@@ -158,7 +163,7 @@ export default function App() {
         } catch {
           setCsvError("The CSV loaded for this session but is too large to keep after refresh.");
         }
-        setDraft({ title: label, dataset: id, type: "bar", dimension: dataset.dimensions[0].key, metric: dataset.metrics[0].key, aggregation: "sum", sortBy: "dimension", sortDirection: "ascending" });
+        setDraft({ title: label, dataset: id, type: "bar", dimension: dataset.dimensions[0].key, metric: dataset.metrics[0].key, aggregation: "sum", sortBy: "dimension", sortDirection: "ascending", palette: "coral", colorMode: "single" });
         setCsvMessage(`${label} loaded · ${rows.length} rows · ${fields.length} columns`);
       },
       error: () => setCsvError("The browser could not read that CSV. Try exporting it again."),
@@ -251,7 +256,7 @@ export default function App() {
               {widgets.map((widget) => (
                 <article className="report-widget" key={widget.id}>
                   <header><div><small>{allDatasets[widget.dataset]?.label ?? "Unavailable data"}{widget.filter ? " · Filtered" : ""}</small><h2>{widget.title}</h2></div><button className="text-button" type="button" onClick={() => removeWidget(widget)}>Remove</button></header>
-                  <Chart label={widget.title} option={buildChartOption(widget, allDatasets)} />
+                  <Chart label={widget.title} option={buildChartOption(widget, allDatasets)} palette={widget.palette} />
                 </article>
               ))}
               {widgets.length === 0 && (
@@ -314,7 +319,7 @@ export default function App() {
                   <label className="field-shelf field-shelf--category" onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropField(event, "dimension")}><span>Category</span><select aria-label="Category field" value={draft.dimension} onChange={(event) => assignField("dimension", event.target.value)}>{activeDataset.dimensions.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select><small>{draft.sortBy === "dimension" ? (draft.sortDirection === "descending" ? "↓ " : "↑ ") : ""}{activeDimension?.label ?? "Drop a category"}</small></label>
                   <label className="field-shelf field-shelf--value" onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropField(event, "metric")}><span>Value</span><select aria-label="Value field" value={draft.metric} onChange={(event) => assignField("metric", event.target.value)}>{activeDataset.metrics.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select><small>{draft.sortBy === "metric" ? (draft.sortDirection === "descending" ? "↓ " : "↑ ") : ""}{draft.aggregation ?? "sum"} · {activeMetric?.label ?? "Drop a value"}</small></label>
                 </div>
-                <article className="builder-preview"><header><div><small>Live preview</small><h2>{draft.title || "Untitled report"}</h2></div></header><Chart label={`Preview of ${draft.title}`} option={buildChartOption(previewWidget, allDatasets)} className="chart--large" /></article>
+                <article className="builder-preview"><header><div><small>Live preview</small><h2>{draft.title || "Untitled report"}</h2></div></header><Chart label={`Preview of ${draft.title}`} option={buildChartOption(previewWidget, allDatasets)} className="chart--large" palette={draft.palette} /></article>
               </section>
 
               <aside className="config-panel" aria-label="Chart configuration">
@@ -323,6 +328,7 @@ export default function App() {
                 <label><span>Aggregation</span><select value={draft.aggregation ?? "sum"} onChange={(event) => setDraft({ ...draft, aggregation: event.target.value as Aggregation })}><option value="sum">Sum</option><option value="average">Average</option><option value="count">Count</option><option value="minimum">Minimum</option><option value="maximum">Maximum</option></select></label>
                 <div className="field-pair"><label><span>Sort by</span><select value={draft.sortBy ?? "dimension"} onChange={(event) => setDraft({ ...draft, sortBy: event.target.value as SortBy })}><option value="dimension">Category</option><option value="metric">Value</option></select></label><label><span>Direction</span><select value={draft.sortDirection ?? "ascending"} onChange={(event) => setDraft({ ...draft, sortDirection: event.target.value as SortDirection })}><option value="ascending">Ascending</option><option value="descending">Descending</option></select></label></div>
                 <fieldset><legend>Filter</legend><label><span>Field</span><select value={draft.filter?.field ?? ""} onChange={(event) => setDraft({ ...draft, filter: event.target.value ? { field: event.target.value, operator: "equals", value: "" } : undefined })}><option value="">No filter</option>{filterFields.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select></label>{draft.filter && <div className="field-pair"><label><span>Operator</span><select value={draft.filter.operator} onChange={(event) => setDraft({ ...draft, filter: { ...draft.filter!, operator: event.target.value as FilterOperator } })}><option value="equals">Equals</option><option value="notEquals">Does not equal</option>{filterIsNumeric ? <><option value="greaterThan">Greater than</option><option value="lessThan">Less than</option></> : <option value="contains">Contains</option>}</select></label><label><span>Value</span><input required type={filterIsNumeric ? "number" : "text"} value={draft.filter.value} onChange={(event) => setDraft({ ...draft, filter: { ...draft.filter!, value: event.target.value } })} placeholder={filterIsNumeric ? "0" : "Enter a value"} /></label></div>}</fieldset>
+                <fieldset><legend>Style</legend><div className="field-pair"><label><span>Palette</span><select value={draft.palette ?? "coral"} onChange={(event) => setDraft({ ...draft, palette: event.target.value as ChartPalette })}><option value="coral">Coral</option><option value="ocean">Ocean</option><option value="forest">Forest</option></select></label><label><span>Color type</span><select disabled={usesCategoryColors} value={usesCategoryColors ? "category" : draft.colorMode ?? "single"} onChange={(event) => setDraft({ ...draft, colorMode: event.target.value as ColorMode })}><option value="single">Single color</option><option value="category">By category</option></select></label></div></fieldset>
                 <fieldset><legend>Chart type</legend><div className="type-picker type-picker--stacked">{(["bar", "line", "area", "pie", "scatter", "radar", "funnel"] as ChartType[]).map((type) => <label key={type}><input type="radio" name="chart-type" value={type} checked={draft.type === type} onChange={() => setDraft({ ...draft, type })} /><span>{type[0].toUpperCase() + type.slice(1)}</span></label>)}</div></fieldset>
               </aside>
             </div>

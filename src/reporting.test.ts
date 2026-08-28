@@ -42,4 +42,9 @@ describe("buildChartOption", () => {
     expect(option.xAxis).toMatchObject({ data: ["Apr", "Jun", "Jul", "Aug"] });
     expect(option.series).toEqual(expect.arrayContaining([expect.objectContaining({ data: [61000, 76000, 83000, 97000] })]));
   });
+
+  it("colors categories when requested", () => {
+    const option = buildChartOption({ id: "styled", title: "Pipeline", dataset: "pipeline", type: "bar", dimension: "month", metric: "value", colorMode: "category" }, datasets);
+    expect(option.series).toEqual(expect.arrayContaining([expect.objectContaining({ colorBy: "data" })]));
+  });
 });

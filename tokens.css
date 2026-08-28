@@ -21,6 +21,14 @@
   --color-chart-2: oklch(29% 0.028 42);
   --color-chart-3: oklch(56% 0.045 58);
   --color-chart-4: oklch(76% 0.055 58);
+  --color-chart-ocean-1: oklch(58% 0.16 235);
+  --color-chart-ocean-2: oklch(64% 0.14 195);
+  --color-chart-ocean-3: oklch(46% 0.12 270);
+  --color-chart-ocean-4: oklch(75% 0.1 210);
+  --color-chart-forest-1: oklch(48% 0.12 150);
+  --color-chart-forest-2: oklch(62% 0.13 130);
+  --color-chart-forest-3: oklch(52% 0.1 90);
+  --color-chart-forest-4: oklch(75% 0.1 155);
 
   --font-display: "Bricolage Grotesque", ui-sans-serif, sans-serif;
   --font-body: "Geist", ui-sans-serif, sans-serif;
