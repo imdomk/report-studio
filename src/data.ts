@@ -13,6 +13,8 @@ export interface Client {
 
 export type ChartType = "bar" | "line" | "area" | "pie" | "scatter" | "radar" | "funnel";
 export type Aggregation = "sum" | "average" | "count" | "minimum" | "maximum";
+export type SortBy = "dimension" | "metric";
+export type SortDirection = "ascending" | "descending";
 
 export interface ReportWidget {
   id: string;
@@ -22,6 +24,8 @@ export interface ReportWidget {
   dimension: string;
   metric: string;
   aggregation?: Aggregation;
+  sortBy?: SortBy;
+  sortDirection?: SortDirection;
 }
 
 export interface DataField {

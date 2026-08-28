@@ -19,8 +19,18 @@ export function buildChartOption(widget: ReportWidget, availableDatasets: Record
     if (!Number.isFinite(value)) return;
     groups.set(label, [...(groups.get(label) ?? []), value]);
   });
-  const labels = [...groups.keys()];
-  const values = [...groups.values()].map((group) => aggregate(group, widget.aggregation ?? "sum"));
+  const points = [...groups].map(([label, group], index) => ({ label, value: aggregate(group, widget.aggregation ?? "sum"), index }));
+  if (widget.sortBy) {
+    const direction = widget.sortDirection === "descending" ? -1 : 1;
+    points.sort((a, b) => {
+      const comparison = widget.sortBy === "metric"
+        ? a.value - b.value
+        : a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" });
+      return comparison === 0 ? a.index - b.index : comparison * direction;
+    });
+  }
+  const labels = points.map(({ label }) => label);
+  const values = points.map(({ value }) => value);
   const compactLabels = labels.slice(0, 12);
   const compactValues = values.slice(0, 12);
 
@@ -48,7 +58,7 @@ export function buildChartOption(widget: ReportWidget, availableDatasets: Record
         left: "10%",
         width: "80%",
         maxSize: "90%",
-        sort: "descending",
+        sort: widget.sortBy ? "none" : "descending",
         itemStyle: { borderWidth: 2 },
         data: compactLabels.map((name, index) => ({ name, value: compactValues[index] })),
       }],

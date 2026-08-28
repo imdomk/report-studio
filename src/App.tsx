@@ -11,6 +11,8 @@ import {
   type ClientStage,
   type DatasetDefinition,
   type ReportWidget,
+  type SortBy,
+  type SortDirection,
 } from "./data";
 import { buildChartOption } from "./reporting";
 
@@ -49,6 +51,8 @@ export default function App() {
     dimension: "week",
     metric: "meetings",
     aggregation: "sum",
+    sortBy: "dimension",
+    sortDirection: "ascending",
   });
 
   const allDatasets = useMemo<Record<string, DatasetDefinition>>(() => ({ ...datasets, ...customDatasets }), [customDatasets]);
@@ -150,7 +154,7 @@ export default function App() {
         } catch {
           setCsvError("The CSV loaded for this session but is too large to keep after refresh.");
         }
-        setDraft({ title: label, dataset: id, type: "bar", dimension: dataset.dimensions[0].key, metric: dataset.metrics[0].key, aggregation: "sum" });
+        setDraft({ title: label, dataset: id, type: "bar", dimension: dataset.dimensions[0].key, metric: dataset.metrics[0].key, aggregation: "sum", sortBy: "dimension", sortDirection: "ascending" });
         setCsvMessage(`${label} loaded · ${rows.length} rows · ${fields.length} columns`);
       },
       error: () => setCsvError("The browser could not read that CSV. Try exporting it again."),
@@ -303,8 +307,8 @@ export default function App() {
 
               <section className="builder-stage" aria-label="Chart canvas">
                 <div className="column-shelf">
-                  <label className="field-shelf field-shelf--category" onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropField(event, "dimension")}><span>Category</span><select aria-label="Category field" value={draft.dimension} onChange={(event) => assignField("dimension", event.target.value)}>{activeDataset.dimensions.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select><small>{activeDimension?.label ?? "Drop a category"}</small></label>
-                  <label className="field-shelf field-shelf--value" onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropField(event, "metric")}><span>Value</span><select aria-label="Value field" value={draft.metric} onChange={(event) => assignField("metric", event.target.value)}>{activeDataset.metrics.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select><small>{draft.aggregation ?? "sum"} · {activeMetric?.label ?? "Drop a value"}</small></label>
+                  <label className="field-shelf field-shelf--category" onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropField(event, "dimension")}><span>Category</span><select aria-label="Category field" value={draft.dimension} onChange={(event) => assignField("dimension", event.target.value)}>{activeDataset.dimensions.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select><small>{draft.sortBy === "dimension" ? (draft.sortDirection === "descending" ? "↓ " : "↑ ") : ""}{activeDimension?.label ?? "Drop a category"}</small></label>
+                  <label className="field-shelf field-shelf--value" onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropField(event, "metric")}><span>Value</span><select aria-label="Value field" value={draft.metric} onChange={(event) => assignField("metric", event.target.value)}>{activeDataset.metrics.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select><small>{draft.sortBy === "metric" ? (draft.sortDirection === "descending" ? "↓ " : "↑ ") : ""}{draft.aggregation ?? "sum"} · {activeMetric?.label ?? "Drop a value"}</small></label>
                 </div>
                 <article className="builder-preview"><header><div><small>Live preview</small><h2>{draft.title || "Untitled report"}</h2></div></header><Chart label={`Preview of ${draft.title}`} option={buildChartOption(previewWidget, allDatasets)} className="chart--large" /></article>
               </section>
@@ -313,6 +317,7 @@ export default function App() {
                 <header><small>Configure</small><h2>Chart</h2></header>
                 <label><span>Report title</span><input required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
                 <label><span>Aggregation</span><select value={draft.aggregation ?? "sum"} onChange={(event) => setDraft({ ...draft, aggregation: event.target.value as Aggregation })}><option value="sum">Sum</option><option value="average">Average</option><option value="count">Count</option><option value="minimum">Minimum</option><option value="maximum">Maximum</option></select></label>
+                <div className="field-pair"><label><span>Sort by</span><select value={draft.sortBy ?? "dimension"} onChange={(event) => setDraft({ ...draft, sortBy: event.target.value as SortBy })}><option value="dimension">Category</option><option value="metric">Value</option></select></label><label><span>Direction</span><select value={draft.sortDirection ?? "ascending"} onChange={(event) => setDraft({ ...draft, sortDirection: event.target.value as SortDirection })}><option value="ascending">Ascending</option><option value="descending">Descending</option></select></label></div>
                 <fieldset><legend>Chart type</legend><div className="type-picker type-picker--stacked">{(["bar", "line", "area", "pie", "scatter", "radar", "funnel"] as ChartType[]).map((type) => <label key={type}><input type="radio" name="chart-type" value={type} checked={draft.type === type} onChange={() => setDraft({ ...draft, type })} /><span>{type[0].toUpperCase() + type.slice(1)}</span></label>)}</div></fieldset>
               </aside>
             </div>

@@ -30,4 +30,10 @@ describe("buildChartOption", () => {
     expect(option.xAxis).toMatchObject({ data: ["North", "South"] });
     expect(option.series).toEqual(expect.arrayContaining([expect.objectContaining({ data: [15, 15] })]));
   });
+
+  it("sorts by the aggregated value", () => {
+    const option = buildChartOption({ id: "sorted", title: "Pipeline", dataset: "pipeline", type: "bar", dimension: "month", metric: "value", sortBy: "metric", sortDirection: "descending" }, datasets);
+    expect(option.xAxis).toMatchObject({ data: ["Aug", "Jul", "Jun", "Apr", "May", "Mar"] });
+    expect(option.series).toEqual(expect.arrayContaining([expect.objectContaining({ data: [97000, 83000, 76000, 61000, 57000, 48000] })]));
+  });
 });
