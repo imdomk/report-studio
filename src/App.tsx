@@ -33,7 +33,7 @@ function readStored<T>(key: string, fallback: T): T {
   }
 }
 
-export default function App() {
+export default function App({ user, onSignOut }: { user: string; onSignOut: () => void }) {
   const [view, setView] = useState<View>("dashboard");
   const [clients, setClients] = useState<Client[]>(() => readStored("report-studio.clients", seedClients));
   const [widgets, setWidgets] = useState<ReportWidget[]>(() => readStored("report-studio.widgets", defaultWidgets));
@@ -219,7 +219,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <header className="topbar">
         <a className="brand" href="#top" onClick={() => setView("dashboard")}><span>RS</span> Report Studio</a>
         <nav className="workspace-nav" aria-label="Workspace">
           {navigation.map((item) => (
@@ -228,11 +228,12 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-user">
-          <span className="avatar" aria-hidden="true">CSV</span>
-          <span><strong>Local workspace</strong><small>Data stays in this browser</small></span>
+        <div className="topbar-user">
+          <span className="avatar" aria-hidden="true">{user.slice(0, 2).toUpperCase()}</span>
+          <span><strong>{user}</strong><small>Data stays in this browser</small></span>
+          <button className="text-button" type="button" onClick={onSignOut}>Sign out</button>
         </div>
-      </aside>
+      </header>
 
       <main className="workspace" id="top">
         <header className="workspace-header">

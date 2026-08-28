@@ -5,5 +5,12 @@
     "theme": "Coral",
     "enrichment": "none",
     "brief": "Self-service CRM dashboard builder for commercial teams and analysts"
+  },
+  {
+    "date": "2026-08-27",
+    "macrostructure": "Console Deck",
+    "theme": "Coral",
+    "enrichment": "none",
+    "brief": "Relayout from fixed sidebar to sticky topbar + centered workspace; added demo sign-in gate"
   }
 ]
