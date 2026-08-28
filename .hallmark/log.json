@@ -9,8 +9,8 @@
   {
     "date": "2026-08-27",
     "macrostructure": "Console Deck",
-    "theme": "Coral",
+    "theme": "Slate",
     "enrichment": "none",
-    "brief": "Relayout from fixed sidebar to sticky topbar + centered workspace; added demo sign-in gate"
+    "brief": "Relayout from fixed sidebar to sticky topbar + centered workspace; added demo sign-in gate; neutral Slate palette and Inter typography"
   }
 ]

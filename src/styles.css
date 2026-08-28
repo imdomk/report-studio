@@ -1,4 +1,4 @@
-/* Hallmark · genre: modern-minimal · macrostructure: Console Deck · theme: Coral · enrichment: none · nav: N3 · footer: Ft2 · pre-emit critique: P5 H5 E4 S5 R5 V5 · contrast: pass (40–41) · slop: pass (42–49) · mobile: pass (34, 49, 50–57) */
+/* Hallmark · genre: modern-minimal · macrostructure: Console Deck · theme: Slate · enrichment: none · nav: N3 · footer: Ft2 · pre-emit critique: P5 H5 E4 S5 R5 V5 · contrast: pass (40–41) · slop: pass (42–49) · mobile: pass (34, 49, 50–57) */
 @import "../tokens.css";
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -28,7 +28,7 @@ h1, h2 {
   color: var(--color-ink);
   font-family: var(--font-display);
   font-style: normal;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.02em;
   line-height: 1.05;
 }
 h1 { font-size: clamp(2rem, 3vw + 1rem, 3.4rem); }
