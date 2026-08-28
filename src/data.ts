@@ -15,6 +15,13 @@ export type ChartType = "bar" | "line" | "area" | "pie" | "scatter" | "radar" | 
 export type Aggregation = "sum" | "average" | "count" | "minimum" | "maximum";
 export type SortBy = "dimension" | "metric";
 export type SortDirection = "ascending" | "descending";
+export type FilterOperator = "equals" | "notEquals" | "contains" | "greaterThan" | "lessThan";
+
+export interface ReportFilter {
+  field: string;
+  operator: FilterOperator;
+  value: string;
+}
 
 export interface ReportWidget {
   id: string;
@@ -26,6 +33,7 @@ export interface ReportWidget {
   aggregation?: Aggregation;
   sortBy?: SortBy;
   sortDirection?: SortDirection;
+  filter?: ReportFilter;
 }
 
 export interface DataField {

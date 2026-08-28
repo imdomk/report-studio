@@ -9,11 +9,23 @@ function aggregate(values: number[], method: Aggregation) {
   return values.reduce((total, value) => total + value, 0);
 }
 
+function matchesFilter(value: string | number, widget: ReportWidget) {
+  const filter = widget.filter;
+  if (!filter || filter.value === "") return true;
+  if (filter.operator === "greaterThan") return Number(value) > Number(filter.value);
+  if (filter.operator === "lessThan") return Number(value) < Number(filter.value);
+  const candidate = String(value).toLocaleLowerCase();
+  const expected = filter.value.toLocaleLowerCase();
+  if (filter.operator === "contains") return candidate.includes(expected);
+  if (filter.operator === "notEquals") return candidate !== expected;
+  return candidate === expected;
+}
+
 export function buildChartOption(widget: ReportWidget, availableDatasets: Record<string, DatasetDefinition>): EChartsOption {
   const dataset = availableDatasets[widget.dataset];
   if (!dataset) return {};
   const groups = new Map<string, number[]>();
-  dataset.rows.forEach((row) => {
+  dataset.rows.filter((row) => !widget.filter || matchesFilter(row[widget.filter.field], widget)).forEach((row) => {
     const label = String(row[widget.dimension]);
     const value = Number(row[widget.metric]);
     if (!Number.isFinite(value)) return;

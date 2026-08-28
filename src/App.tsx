@@ -10,6 +10,7 @@ import {
   type Client,
   type ClientStage,
   type DatasetDefinition,
+  type FilterOperator,
   type ReportWidget,
   type SortBy,
   type SortDirection,
@@ -60,6 +61,8 @@ export default function App() {
   const previewWidget: ReportWidget = { ...draft, id: "preview" };
   const activeDimension = activeDataset.dimensions.find((field) => field.key === draft.dimension);
   const activeMetric = activeDataset.metrics.find((field) => field.key === draft.metric);
+  const filterFields = [...activeDataset.dimensions, ...activeDataset.metrics];
+  const filterIsNumeric = activeDataset.metrics.some((field) => field.key === draft.filter?.field);
   const filteredClients = useMemo(() => clients.filter((client) => {
     const matchesQuery = `${client.contact} ${client.company} ${client.email}`.toLowerCase().includes(query.toLowerCase());
     return matchesQuery && (stage === "All" || client.stage === stage);
@@ -88,6 +91,7 @@ export default function App() {
       dimension: definition.dimensions[0].key,
       metric: definition.metrics[0].key,
       aggregation: "sum",
+      filter: undefined,
     }));
   }
 
@@ -246,7 +250,7 @@ export default function App() {
             <div className="widget-grid">
               {widgets.map((widget) => (
                 <article className="report-widget" key={widget.id}>
-                  <header><div><small>{allDatasets[widget.dataset]?.label ?? "Unavailable data"}</small><h2>{widget.title}</h2></div><button className="text-button" type="button" onClick={() => removeWidget(widget)}>Remove</button></header>
+                  <header><div><small>{allDatasets[widget.dataset]?.label ?? "Unavailable data"}{widget.filter ? " · Filtered" : ""}</small><h2>{widget.title}</h2></div><button className="text-button" type="button" onClick={() => removeWidget(widget)}>Remove</button></header>
                   <Chart label={widget.title} option={buildChartOption(widget, allDatasets)} />
                 </article>
               ))}
@@ -318,6 +322,7 @@ export default function App() {
                 <label><span>Report title</span><input required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
                 <label><span>Aggregation</span><select value={draft.aggregation ?? "sum"} onChange={(event) => setDraft({ ...draft, aggregation: event.target.value as Aggregation })}><option value="sum">Sum</option><option value="average">Average</option><option value="count">Count</option><option value="minimum">Minimum</option><option value="maximum">Maximum</option></select></label>
                 <div className="field-pair"><label><span>Sort by</span><select value={draft.sortBy ?? "dimension"} onChange={(event) => setDraft({ ...draft, sortBy: event.target.value as SortBy })}><option value="dimension">Category</option><option value="metric">Value</option></select></label><label><span>Direction</span><select value={draft.sortDirection ?? "ascending"} onChange={(event) => setDraft({ ...draft, sortDirection: event.target.value as SortDirection })}><option value="ascending">Ascending</option><option value="descending">Descending</option></select></label></div>
+                <fieldset><legend>Filter</legend><label><span>Field</span><select value={draft.filter?.field ?? ""} onChange={(event) => setDraft({ ...draft, filter: event.target.value ? { field: event.target.value, operator: "equals", value: "" } : undefined })}><option value="">No filter</option>{filterFields.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select></label>{draft.filter && <div className="field-pair"><label><span>Operator</span><select value={draft.filter.operator} onChange={(event) => setDraft({ ...draft, filter: { ...draft.filter!, operator: event.target.value as FilterOperator } })}><option value="equals">Equals</option><option value="notEquals">Does not equal</option>{filterIsNumeric ? <><option value="greaterThan">Greater than</option><option value="lessThan">Less than</option></> : <option value="contains">Contains</option>}</select></label><label><span>Value</span><input required type={filterIsNumeric ? "number" : "text"} value={draft.filter.value} onChange={(event) => setDraft({ ...draft, filter: { ...draft.filter!, value: event.target.value } })} placeholder={filterIsNumeric ? "0" : "Enter a value"} /></label></div>}</fieldset>
                 <fieldset><legend>Chart type</legend><div className="type-picker type-picker--stacked">{(["bar", "line", "area", "pie", "scatter", "radar", "funnel"] as ChartType[]).map((type) => <label key={type}><input type="radio" name="chart-type" value={type} checked={draft.type === type} onChange={() => setDraft({ ...draft, type })} /><span>{type[0].toUpperCase() + type.slice(1)}</span></label>)}</div></fieldset>
               </aside>
             </div>

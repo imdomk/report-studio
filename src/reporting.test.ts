@@ -36,4 +36,10 @@ describe("buildChartOption", () => {
     expect(option.xAxis).toMatchObject({ data: ["Aug", "Jul", "Jun", "Apr", "May", "Mar"] });
     expect(option.series).toEqual(expect.arrayContaining([expect.objectContaining({ data: [97000, 83000, 76000, 61000, 57000, 48000] })]));
   });
+
+  it("filters raw rows before grouping and sorting", () => {
+    const option = buildChartOption({ id: "filtered", title: "Pipeline", dataset: "pipeline", type: "bar", dimension: "month", metric: "value", filter: { field: "value", operator: "greaterThan", value: "60000" } }, datasets);
+    expect(option.xAxis).toMatchObject({ data: ["Apr", "Jun", "Jul", "Aug"] });
+    expect(option.series).toEqual(expect.arrayContaining([expect.objectContaining({ data: [61000, 76000, 83000, 97000] })]));
+  });
 });
