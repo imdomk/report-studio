@@ -12,6 +12,7 @@ export interface Client {
 }
 
 export type ChartType = "bar" | "line" | "area" | "pie" | "scatter" | "radar" | "funnel";
+export type Aggregation = "sum" | "average" | "count" | "minimum" | "maximum";
 
 export interface ReportWidget {
   id: string;
@@ -20,6 +21,7 @@ export interface ReportWidget {
   type: ChartType;
   dimension: string;
   metric: string;
+  aggregation?: Aggregation;
 }
 
 export interface DataField {

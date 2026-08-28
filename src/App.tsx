@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type DragEvent, type FormEvent } from "react";
 import Papa from "papaparse";
 import { Chart } from "./Chart";
 import {
   datasets,
   defaultWidgets,
   seedClients,
+  type Aggregation,
   type ChartType,
   type Client,
   type ClientStage,
@@ -14,6 +15,7 @@ import {
 import { buildChartOption } from "./reporting";
 
 type View = "dashboard" | "clients" | "builder";
+type FieldKind = "dimension" | "metric";
 
 const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -38,6 +40,7 @@ export default function App() {
   const [undoWidget, setUndoWidget] = useState<ReportWidget | null>(null);
   const clientDialog = useRef<HTMLDialogElement>(null);
   const clientNameInput = useRef<HTMLInputElement>(null);
+  const draggedField = useRef<{ kind: FieldKind; key: string } | null>(null);
 
   const [draft, setDraft] = useState<Omit<ReportWidget, "id">>({
     title: "Commercial activity by week",
@@ -45,11 +48,14 @@ export default function App() {
     type: "line",
     dimension: "week",
     metric: "meetings",
+    aggregation: "sum",
   });
 
   const allDatasets = useMemo<Record<string, DatasetDefinition>>(() => ({ ...datasets, ...customDatasets }), [customDatasets]);
   const activeDataset = allDatasets[draft.dataset] ?? datasets.activity;
   const previewWidget: ReportWidget = { ...draft, id: "preview" };
+  const activeDimension = activeDataset.dimensions.find((field) => field.key === draft.dimension);
+  const activeMetric = activeDataset.metrics.find((field) => field.key === draft.metric);
   const filteredClients = useMemo(() => clients.filter((client) => {
     const matchesQuery = `${client.contact} ${client.company} ${client.email}`.toLowerCase().includes(query.toLowerCase());
     return matchesQuery && (stage === "All" || client.stage === stage);
@@ -77,7 +83,18 @@ export default function App() {
       dataset,
       dimension: definition.dimensions[0].key,
       metric: definition.metrics[0].key,
+      aggregation: "sum",
     }));
+  }
+
+  function assignField(kind: FieldKind, key: string) {
+    setDraft((current) => ({ ...current, [kind]: key }));
+  }
+
+  function dropField(event: DragEvent<HTMLElement>, kind: FieldKind) {
+    event.preventDefault();
+    const field = draggedField.current;
+    if (field?.kind === kind) assignField(kind, field.key);
   }
 
   function loadCsv(file?: File) {
@@ -133,7 +150,7 @@ export default function App() {
         } catch {
           setCsvError("The CSV loaded for this session but is too large to keep after refresh.");
         }
-        setDraft({ title: label, dataset: id, type: "bar", dimension: dataset.dimensions[0].key, metric: dataset.metrics[0].key });
+        setDraft({ title: label, dataset: id, type: "bar", dimension: dataset.dimensions[0].key, metric: dataset.metrics[0].key, aggregation: "sum" });
         setCsvMessage(`${label} loaded · ${rows.length} rows · ${fields.length} columns`);
       },
       error: () => setCsvError("The browser could not read that CSV. Try exporting it again."),
@@ -264,27 +281,42 @@ export default function App() {
         )}
 
         {view === "builder" && (
-          <section className="builder-layout" aria-label="Chart builder">
-            <form className="builder-form" onSubmit={saveReport}>
-              <p>Upload a CSV or use a sample dataset. Choose a dimension, measure and chart type; the preview updates before you save.</p>
-              <label className="csv-upload">
-                <span className="csv-upload__button">Upload CSV</span>
-                <input type="file" accept=".csv,text/csv" onChange={(event) => { loadCsv(event.target.files?.[0]); event.target.value = ""; }} />
-                <small>CSV with headers · maximum 1 MB · first 2,000 rows</small>
-              </label>
-              {csvMessage && <p className="csv-message" role="status">{csvMessage}</p>}
-              {csvError && <p className="csv-error" role="alert">{csvError}</p>}
-              <label><span>Report title</span><input required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
-              <label><span>Dataset</span><select value={draft.dataset} onChange={(event) => changeDataset(event.target.value)}>{Object.entries(allDatasets).map(([key, dataset]) => <option key={key} value={key}>{dataset.label}</option>)}</select></label>
-              <div className="field-pair">
-                <label><span>Dimension</span><select value={draft.dimension} onChange={(event) => setDraft({ ...draft, dimension: event.target.value })}>{activeDataset.dimensions.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select></label>
-                <label><span>Measure</span><select value={draft.metric} onChange={(event) => setDraft({ ...draft, metric: event.target.value })}>{activeDataset.metrics.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select></label>
-              </div>
-              <fieldset><legend>Chart type</legend><div className="type-picker">{(["bar", "line", "area", "pie", "scatter", "radar", "funnel"] as ChartType[]).map((type) => <label key={type}><input type="radio" name="chart-type" value={type} checked={draft.type === type} onChange={() => setDraft({ ...draft, type })} /><span>{type[0].toUpperCase() + type.slice(1)}</span></label>)}</div></fieldset>
-              <div className="form-actions"><button className="button" type="button" onClick={() => setView("dashboard")}>Cancel</button><button className="button button--primary" type="submit">Add to dashboard</button></div>
-            </form>
-            <article className="builder-preview"><header><small>Live preview</small><h2>{draft.title || "Untitled report"}</h2></header><Chart label={`Preview of ${draft.title}`} option={buildChartOption(previewWidget, allDatasets)} className="chart--large" /></article>
-          </section>
+          <form className="chart-builder" aria-label="Chart builder" onSubmit={saveReport}>
+            <header className="builder-toolbar">
+              <div className="builder-toolbar__title"><small>Chart builder</small><strong>{activeDataset.label}</strong></div>
+              <label className="toolbar-upload"><span>Upload CSV</span><input type="file" accept=".csv,text/csv" onChange={(event) => { loadCsv(event.target.files?.[0]); event.target.value = ""; }} /></label>
+              <button className="button" type="button" onClick={() => setView("dashboard")}>Cancel</button>
+              <button className="button button--primary" type="submit">Add to dashboard</button>
+            </header>
+
+            {csvMessage && <p className="builder-message" role="status">{csvMessage}</p>}
+            {csvError && <p className="builder-error" role="alert">{csvError}</p>}
+
+            <div className="builder-workbench">
+              <aside className="data-panel" aria-label="Data fields">
+                <header><small>Data</small><h2>Fields</h2></header>
+                <label><span>Dataset</span><select value={draft.dataset} onChange={(event) => changeDataset(event.target.value)}>{Object.entries(allDatasets).map(([key, dataset]) => <option key={key} value={key}>{dataset.label}</option>)}</select></label>
+                <section className="field-group" aria-labelledby="category-fields"><h3 id="category-fields">Categories</h3>{activeDataset.dimensions.map((field) => <button className="field-button field-button--category" key={field.key} type="button" draggable onDragStart={(event) => { draggedField.current = { kind: "dimension", key: field.key }; event.dataTransfer.effectAllowed = "copy"; }} onDragEnd={() => { draggedField.current = null; }} onClick={() => assignField("dimension", field.key)}><span aria-hidden="true">Aa</span>{field.label}</button>)}</section>
+                <section className="field-group" aria-labelledby="value-fields"><h3 id="value-fields">Values</h3>{activeDataset.metrics.map((field) => <button className="field-button field-button--value" key={field.key} type="button" draggable onDragStart={(event) => { draggedField.current = { kind: "metric", key: field.key }; event.dataTransfer.effectAllowed = "copy"; }} onDragEnd={() => { draggedField.current = null; }} onClick={() => assignField("metric", field.key)}><span aria-hidden="true">#</span>{field.label}</button>)}</section>
+                <small>Drag a field to a shelf, or select it.</small>
+              </aside>
+
+              <section className="builder-stage" aria-label="Chart canvas">
+                <div className="column-shelf">
+                  <label className="field-shelf field-shelf--category" onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropField(event, "dimension")}><span>Category</span><select aria-label="Category field" value={draft.dimension} onChange={(event) => assignField("dimension", event.target.value)}>{activeDataset.dimensions.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select><small>{activeDimension?.label ?? "Drop a category"}</small></label>
+                  <label className="field-shelf field-shelf--value" onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropField(event, "metric")}><span>Value</span><select aria-label="Value field" value={draft.metric} onChange={(event) => assignField("metric", event.target.value)}>{activeDataset.metrics.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}</select><small>{draft.aggregation ?? "sum"} · {activeMetric?.label ?? "Drop a value"}</small></label>
+                </div>
+                <article className="builder-preview"><header><div><small>Live preview</small><h2>{draft.title || "Untitled report"}</h2></div></header><Chart label={`Preview of ${draft.title}`} option={buildChartOption(previewWidget, allDatasets)} className="chart--large" /></article>
+              </section>
+
+              <aside className="config-panel" aria-label="Chart configuration">
+                <header><small>Configure</small><h2>Chart</h2></header>
+                <label><span>Report title</span><input required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
+                <label><span>Aggregation</span><select value={draft.aggregation ?? "sum"} onChange={(event) => setDraft({ ...draft, aggregation: event.target.value as Aggregation })}><option value="sum">Sum</option><option value="average">Average</option><option value="count">Count</option><option value="minimum">Minimum</option><option value="maximum">Maximum</option></select></label>
+                <fieldset><legend>Chart type</legend><div className="type-picker type-picker--stacked">{(["bar", "line", "area", "pie", "scatter", "radar", "funnel"] as ChartType[]).map((type) => <label key={type}><input type="radio" name="chart-type" value={type} checked={draft.type === type} onChange={() => setDraft({ ...draft, type })} /><span>{type[0].toUpperCase() + type.slice(1)}</span></label>)}</div></fieldset>
+              </aside>
+            </div>
+          </form>
         )}
 
         <footer className="status-footer"><span>Report Studio · local CSV workspace</span><span>React · Papa Parse · ECharts</span></footer>

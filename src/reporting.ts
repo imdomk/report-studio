@@ -1,11 +1,26 @@
 import type { EChartsOption } from "echarts";
-import type { DatasetDefinition, ReportWidget } from "./data";
+import type { Aggregation, DatasetDefinition, ReportWidget } from "./data";
+
+function aggregate(values: number[], method: Aggregation) {
+  if (method === "count") return values.length;
+  if (method === "average") return values.reduce((total, value) => total + value, 0) / Math.max(values.length, 1);
+  if (method === "minimum") return Math.min(...values);
+  if (method === "maximum") return Math.max(...values);
+  return values.reduce((total, value) => total + value, 0);
+}
 
 export function buildChartOption(widget: ReportWidget, availableDatasets: Record<string, DatasetDefinition>): EChartsOption {
   const dataset = availableDatasets[widget.dataset];
   if (!dataset) return {};
-  const labels = dataset.rows.map((row) => String(row[widget.dimension]));
-  const values = dataset.rows.map((row) => Number(row[widget.metric]));
+  const groups = new Map<string, number[]>();
+  dataset.rows.forEach((row) => {
+    const label = String(row[widget.dimension]);
+    const value = Number(row[widget.metric]);
+    if (!Number.isFinite(value)) return;
+    groups.set(label, [...(groups.get(label) ?? []), value]);
+  });
+  const labels = [...groups.keys()];
+  const values = [...groups.values()].map((group) => aggregate(group, widget.aggregation ?? "sum"));
   const compactLabels = labels.slice(0, 12);
   const compactValues = values.slice(0, 12);
 

@@ -16,4 +16,18 @@ describe("buildChartOption", () => {
       expect(option.series).toBeTruthy();
     }
   });
+
+  it("groups repeated categories with the selected aggregation", () => {
+    const source = {
+      sample: {
+        label: "Sample",
+        dimensions: [{ key: "region", label: "Region" }],
+        metrics: [{ key: "sales", label: "Sales" }],
+        rows: [{ region: "North", sales: 10 }, { region: "North", sales: 20 }, { region: "South", sales: 15 }],
+      },
+    };
+    const option = buildChartOption({ id: "average", title: "Average sales", dataset: "sample", type: "bar", dimension: "region", metric: "sales", aggregation: "average" }, source);
+    expect(option.xAxis).toMatchObject({ data: ["North", "South"] });
+    expect(option.series).toEqual(expect.arrayContaining([expect.objectContaining({ data: [15, 15] })]));
+  });
 });
